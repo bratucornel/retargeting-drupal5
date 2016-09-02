@@ -112,6 +112,83 @@ function retargetingtracker_footer($main = 0) {
         $ra_set_email .= '};';
         drupal_add_js($ra_set_email, 'inline', 'header');
     }
+
+    /*
+     * saveOrder
+     */
+    if(arg(0) == 'cart' && arg(1) == 'checkout' && arg(2) == 'complete') {
+        $tax = 0;
+        $shipping_cost = 0;
+        uc_order_load($_SESSION['uc_googleanalytics_order_id']);
+        if($order = uc_order_load($_SESSION['retargetingtracker_order_id'])) {
+
+            // Finding name of country; if not found, use the country code.
+            if ($country_data = uc_get_country_data(
+                array('country_id' => $order->billing_country))
+            ) {
+                $country = $country_data[0]['country_name'];
+            }
+            else {
+                $country = $order->billing_country;
+            }
+
+            foreach ($order->line_items as $line_item) {
+                if ($line_item['type'] == 'tax') {
+                    $tax += $line_item['amount'];
+                }
+                if ($line_item['type'] == 'shipping') {
+                    $shipping_cost += $line_item['amount'];
+                }
+            }
+
+            $ra_order_info = array(
+                'order_no'      => $order->order_id,
+                'lastname'      => $order->billing_first_name,
+                'firstname'     => $order->billing_last_name,
+                'email'         => $order->primary_email,
+                'phone'         => $order->billing_phone,
+                'state'         => $country,
+                'city'          => $order->billing_city,
+                'address'       => $order->billing_street1 . ' ' . $order->billing_street1,
+                'discount_code' => 0,
+                'discount'      => 0,
+                'shipping'      => $shipping_cost,
+                'rebates'       => 0,
+                'fees'          => $tax,
+                'total'         => $order->order_total
+            );
+
+        $ra_order_products = array();
+            foreach ($order->products as $product) {
+                $ra_order_products['id'] = $product->nid;
+                $ra_order_products['qty'] = $product->qty;
+                $ra_order_products['price'] = $product->price;
+                $ra_order_products['variation_code'] = '';
+            }
+        }
+        $save_order_script = 'var _ra = _ra || {};' . "\r\n";
+        $save_order_script .= '_ra.saveOrderInfo = ' . json_encode($ra_order_info) . "\r\n";
+        $save_order_script .= '_ra.saveOrderProducts = ' . json_encode($ra_order_products) . "\r\n";
+        $save_order_script .= '
+         if( _ra.ready !== undefined ) {
+            _ra.saveOrder(_ra.saveOrderInfo, _ra.saveOrderProducts);
+            }
+        ';
+
+        drupal_add_js($save_order_script, 'inline', 'footer');
+        unset($_SESSION['retargetingtracker_order_id']);
+    }
+}
+
+/*
+ * hook_order
+ */
+function retargetingtracker_order($op, &$arg1, $arg2) {
+    switch ($op) {
+        case 'new':
+            $_SESSION['retargetingtracker_order_id'] = $arg1->order_id;
+            break;
+    }
 }
 
 function retargetingtracker_admin_settings_form() {
