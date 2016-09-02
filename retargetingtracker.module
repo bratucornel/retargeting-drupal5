@@ -1,0 +1,154 @@
+<?php
+/**
+ * Created by PhpStorm.
+ * User: Cornel
+ * Date: 29/08/16
+ * Time: 12:03 PM
+ */
+
+/*
+ * @file
+ * Drupal Module: Retargeting Tracker
+ * Adds the required Retargeting Javascript code.
+ *
+ * @author: Cornel Bratu <https://retargeting.biz/>
+ */
+
+/*
+ * Top section of plugin settings page
+ */
+function retargetingtracker_help($section) {
+    switch ($section) {
+        case 'admin/settings/retargetingtracker':
+            return t('<a href="@ra_url">Retargeting Tracker</a>', array('@ra_url'=> 'https://retargeting.biz/'));
+    }
+}
+
+function retargetingtracker_perm() {
+    return array(
+        'administer retargetingtracker',
+        'opt-in or out of tracking',
+        'use PHP for tracking visibility'
+    );
+}
+
+function retargetingtracker_menu($mycache) {
+    $items = array();
+
+    if($mycache) {
+        $items[] = array(
+            'path'              =>  'admin/settings/retargetingtracker',
+            'title'             =>  'Retargeting Tracker',
+            'description'       =>  'Retargeting tracker settings',
+            'callback'          =>  'drupal_get_form',
+            'callback arguments'=>  'retargetingtracker_admin_settings_form',
+            'access'            =>  user_access('administer retargeting tracker'),
+            'type'              =>  MENU_NORMAL_ITEM
+        );
+    }
+
+    return $items;
+}
+
+/*
+ * Implement of hook_footer() to insert js script
+ */
+function retargetingtracker_footer($main = 0) {
+    global $user;
+
+    $trackingKey = variable_get('retargetingtracker_js_key', '');
+
+    if(empty($trackingKey)) {
+        $script = console.log('Retargeting Tracking API Key not set');
+    } else {
+        $script = '
+        (function(){
+            ra_key = ' . drupal_to_js($trackingKey) . ';
+            ra_params = {
+                add_to_cart_button_id: "add_to_cart_button_id",
+                price_label_id: "price_label_id",
+            };
+            var ra = document.createElement("script");
+            ra.type ="text/javascript";
+            ra.async = true;
+            ra.src = ("https:" == document.location.protocol ? "https://" : "http://") + "tracking.retargeting.biz/v3/rajs/" + ra_key + ".js";
+            var s = document.getElementsByTagName("script")[0];
+            s.parentNode.insertBefore(ra,s);
+        })();';
+    }
+
+    //get all products added to cart
+    $productsInCart = uc_cart_get_contents();
+
+    drupal_add_js($script, 'inline', 'header');
+
+    /*
+     * setEmail implementation
+     */
+    if(isset($user->mail)) {
+        $ra_set_email   = '
+            var _ra = _ra || {};
+            if (_ra.ready !== undefined) {
+        ';
+        $ra_set_email .= '_ra.setEmail({"email": '.drupal_to_js($user->mail).'});';
+        $ra_set_email .= '};';
+        drupal_add_js($ra_set_email, 'inline', 'header');
+    }
+}
+
+function retargetingtracker_admin_settings_form() {
+    $form['account'] = array(
+        '#type'     =>  'fieldset',
+        '#title'    =>  'Retargeting Tracker Settings',
+        '#collapsible'  => false
+    );
+
+    $form['account']['retargetingtracker_js_key'] = array(
+        '#type'     =>  'textfield',
+        '#title'    =>  'Tracking API KEY',
+        '#default_value'    => variable_get('retargetingtracker_js_key', ''),
+        '#size'     =>  20,
+        '#maxlength'    =>  20,
+        '#required'     =>  true,
+        '#description'  =>  'Enter your Javascript Tracking Code. Click here to get it.'
+    );
+
+    $form['account']['retargetingtracker_rest_api'] = array(
+        '#type'     =>  'textfield',
+        '#title'    =>  'REST API Key',
+        '#default_value'    =>  variable_get('retargetingtracker_rest_api', ''),
+        '#size'         =>  20,
+        '#maxlength'    =>  20,
+        '#required'     => true,
+        '#description'  =>  'Enter your REST API Key'
+    );
+
+    return system_settings_form($form);
+}
+
+function retargetingtracker_admin_settings_form_submit($form_id, $form_values) {
+    $form_values['retargetingtracker_js_key'] = trim($form_values['retargetingtracker_js_key']);
+    $form_values['retargetingtracker_rest_api'] - trim($form_values['retargetingtracker_rest_api']);
+    system_settings_form_submit($form_id, $form_values);
+}
+
+/*
+ * hook_requirements()
+ */
+function retargetingtracker_requirements($phase) {
+    $requirements = array();
+
+    if($phase == 'runtime') {
+        //Check if api key is set
+        if(variable_get('retargetingtracker_js_key', '') == '') {
+            $requirements['retargetingtracker'] = array(
+                'title' =>  'Retargeting Tracking module',
+                'description'   =>  'Error',
+                'severity'  =>  REQUIREMENT_ERROR,
+                'value'     =>  'Not configured'
+            );
+        }
+    }
+    return $requirements;
+}
+

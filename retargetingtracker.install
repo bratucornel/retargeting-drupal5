@@ -1,0 +1,42 @@
+<?php
+
+/**
+ * @file
+ * Installation file for Retargeting Tracking module.
+ */
+
+function retargetingtracking_install() {
+    variable_set('retargetingtracking_visibility', 0);
+
+    /*
+     * Remove tracking from administrative pages
+     */
+
+    $pages = array(
+        'admin',
+        'admin/*',
+        'user/*/*',
+        'node/add*',
+        'node/*/*'
+    );
+
+    variable_set('retargetingtracking_pages', implode("\n", $pages));
+}
+
+function retargetingtracking_uninstall() {
+    variable_del('retargetingtracking_account');
+    variable_del('retargetingtracking_visibility');
+    variable_del('retargetingtracking_legacy_version');
+    /*
+     * TODO: adauga si restul elementelor ce trebuiesc dezinstalate
+     */
+}
+
+//function retargetingtracking_disable() {
+//    $path = file_directory_path() . '/retargeting_tracker';
+//    if(file_exists($path)) {
+//        /**
+//         * TODO: continue
+//         */
+//    }
+//}
