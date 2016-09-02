@@ -55,11 +55,11 @@ function retargetingtracker_menu($mycache) {
  */
 function retargetingtracker_footer($main = 0) {
     global $user;
-
+    var_dump($nid);
     $trackingKey = variable_get('retargetingtracker_js_key', '');
 
     if(empty($trackingKey)) {
-        $script = console.log('Retargeting Tracking API Key not set');
+        $script = "console.log('Retargeting Tracking API Key not set')";
     } else {
         $script = '
         (function(){
@@ -84,7 +84,6 @@ function retargetingtracker_footer($main = 0) {
     $productsInCart = uc_cart_get_contents();
 
     if(!empty($productsInCart) && arg(0) == 'cart') {
-        var_dump(arg(0));
         $ra_checkout_ids_info = array();
         foreach ($productsInCart as $product) {
             $ra_checkout_ids_info[] = $product->nid;
