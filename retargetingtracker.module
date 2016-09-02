@@ -76,11 +76,28 @@ function retargetingtracker_footer($main = 0) {
             s.parentNode.insertBefore(ra,s);
         })();';
     }
+    drupal_add_js($script, 'inline', 'header');
 
-    //get all products added to cart
+    /*
+     * checkoutIds
+     */
     $productsInCart = uc_cart_get_contents();
 
-    drupal_add_js($script, 'inline', 'header');
+    if(!empty($productsInCart)) {
+        $ra_checkout_ids_info = array();
+        foreach ($productsInCart as $product) {
+            $ra_checkout_ids_info[] = $product->nid;
+        }
+
+        $checkout_ids_script = '
+            var _ra = _ra || {};
+            _ra.checkoutIdsInfo = ' . drupal_to_js($ra_checkout_ids_info) . '
+             if (_ra.ready !== undefined) {
+                _ra.checkoutIds(_ra.checkoutIdsInfo);
+             }       
+        ';
+        drupal_add_js($checkout_ids_script, 'inline', 'header');
+    }
 
     /*
      * setEmail implementation
