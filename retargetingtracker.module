@@ -83,7 +83,8 @@ function retargetingtracker_footer($main = 0) {
      */
     $productsInCart = uc_cart_get_contents();
 
-    if(!empty($productsInCart)) {
+    if(!empty($productsInCart) && arg(0) == 'cart') {
+        var_dump(arg(0));
         $ra_checkout_ids_info = array();
         foreach ($productsInCart as $product) {
             $ra_checkout_ids_info[] = $product->nid;
