@@ -55,9 +55,8 @@ function retargetingtracker_menu($mycache) {
  */
 function retargetingtracker_footer($main = 0) {
     global $user;
-    var_dump($nid);
-    $trackingKey = variable_get('retargetingtracker_js_key', '');
 
+    $trackingKey = variable_get('retargetingtracker_js_key', '');
     if(empty($trackingKey)) {
         $script = "console.log('Retargeting Tracking API Key not set')";
     } else {
@@ -177,6 +176,17 @@ function retargetingtracker_footer($main = 0) {
         drupal_add_js($save_order_script, 'inline', 'footer');
         unset($_SESSION['retargetingtracker_order_id']);
     }
+
+
+    /*
+     * sendProduct
+    */
+    $is_product = retargetingtracker_is_product_page();
+
+    if($is_product !== false ){
+        retargetingtracker_send_product($is_product);
+    }
+
 }
 
 /*
@@ -222,7 +232,7 @@ function retargetingtracker_admin_settings_form() {
 
 function retargetingtracker_admin_settings_form_submit($form_id, $form_values) {
     $form_values['retargetingtracker_js_key'] = trim($form_values['retargetingtracker_js_key']);
-    $form_values['retargetingtracker_rest_api'] - trim($form_values['retargetingtracker_rest_api']);
+    $form_values['retargetingtracker_rest_api'] = trim($form_values['retargetingtracker_rest_api']);
     system_settings_form_submit($form_id, $form_values);
 }
 
@@ -246,3 +256,59 @@ function retargetingtracker_requirements($phase) {
     return $requirements;
 }
 
+function retargetingtracker_is_product_page() {
+
+    if ( arg(0) == 'node' && is_numeric(arg(1)) && !arg(2) ) {
+        // Viewing a single node, get the node
+        $node = node_load(arg(1));
+        // Test for node type, we use a switch to make it easy to look for more than one node type
+        switch ( $node->type ) {
+            case 'product':
+//                var_dump($node);
+                return $node;
+        }
+    }
+    // If we get here we don't want the block visible
+    return false;
+}
+
+function retargetingtracker_send_product($node) {
+//    echo "<pre>";
+//var_dump(uc_stock_level($node->model) );
+
+    if(uc_stock_level($node->model) > 0) {
+        $stock  = 1;
+    } else {
+        $stock = 0;
+    }
+
+//    if($node->taxonomy)
+
+    $ra_send_product_info = array(
+        'id' => $node->nid,
+        'name' => $node->title,
+        'url' => 'http://site.com/tv/men-sneakers',
+        'img' => $node->files[1]->filepath,
+        'price' => $node->list_price,
+        'promo' => $node->sell_price,
+        'brand' => false,
+        'category' => array(
+            'id' => $node->taxonomy[1]->tid,
+            'name' => $node->taxonomy[1]->name,
+            'parent' => false,
+            'breadcrumb' => array()
+        ),
+        'inventory' => array(
+            'variations' => false,
+            'stock' => $stock
+        )
+    );
+
+    $script = "var _ra = _ra || {};" . "\r\n";
+    $script .= "_ra.sendProductInfo = " . json_encode($ra_send_product_info) . "\r\n";
+    $script .= "if (_ra.ready !== undefined) {
+        _ra.sendProduct(_ra.sendProductInfo);}";
+
+    drupal_add_js($script, 'inline', 'footer');
+
+}
