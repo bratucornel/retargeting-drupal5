@@ -117,7 +117,7 @@ function retargetingtracker_footer($main = 0) {
     if(arg(0) == 'cart' && arg(1) == 'checkout' && arg(2) == 'complete') {
         $tax = 0;
         $shipping_cost = 0;
-        uc_order_load($_SESSION['uc_googleanalytics_order_id']);
+//        uc_order_load($_SESSION['uc_googleanalytics_order_id']);
         if($order = uc_order_load($_SESSION['retargetingtracker_order_id'])) {
 
             // Finding name of country; if not found, use the country code.
@@ -316,6 +316,7 @@ function retargetingtracker_is_product_page() {
 }
 
 function retargetingtracker_send_product($node) {
+    global $base_url;
 
     if(module_exists('uc_stoc') && uc_stock_level($node->model) > 0) {
         $stock = 1;
@@ -337,7 +338,7 @@ function retargetingtracker_send_product($node) {
     $ra_send_product_info = array(
         'id' => $node->nid,
         'name' => $node->title,
-        'url' => 'http://site.com/tv/men-sneakers',
+        'url' => false,
         'img' => $node->files[1]->filepath,
         'price' => $node->list_price,
         'promo' => $node->sell_price,
@@ -360,5 +361,19 @@ function retargetingtracker_send_product($node) {
         _ra.sendProduct(_ra.sendProductInfo);}";
 
     drupal_add_js($script, 'inline', 'footer');
+
+    /*
+     * AddToCart
+     */
+    $retargeting_add_to_cart = '
+    var raAddToCartButton = document.getElementsByClassName("node-add-to-cart")[0];
+    raAddToCartButton.addEventListener("click", function(){
+         _ra.addToCart('.$node->nid.', 1, false, function() {
+            console.log("the informations have been sent");
+        });
+    });
+    ';
+
+    drupal_add_js($retargeting_add_to_cart, 'inline', 'footer');
 
 }
