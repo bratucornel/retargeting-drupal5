@@ -187,6 +187,14 @@ function retargetingtracker_footer($main = 0) {
         retargetingtracker_send_product($is_product);
     }
 
+    /*
+     * sendCategory
+     */
+
+    $is_category = retargetingtracker_is_category();
+    if($is_category !== false) {
+        retargetingtracker_send_category($is_category);
+    }
 }
 
 /*
@@ -256,6 +264,42 @@ function retargetingtracker_requirements($phase) {
     return $requirements;
 }
 
+/*
+ * Check if current page is category
+ */
+function retargetingtracker_is_category() {
+    if (arg(0) == 'taxonomy' && arg(1) == 'term' && arg(2)) {
+        $category_details = taxonomy_node_get_terms(arg(2));
+        return $category_details;
+    }
+    return false;
+}
+
+/*
+ * sendCategory
+ */
+function retargetingtracker_send_category($details) {
+
+    $category_details = array_shift($details);
+    $ra_send_category_info  = array(
+        'id'    =>  $category_details->tid,
+        'name'  =>  $category_details->name,
+        'parent' => false,
+        'breadcrumb' => array()
+    );
+
+    $script = 'var _ra = _ra || {};' . "\r\n";
+    $script .= '_ra.sendCategoryInfo = ' . json_encode($ra_send_category_info) . "\r\n";
+    $script .= 'if (_ra.ready !== undefined) {
+        _ra.sendCategory(_ra.sendCategoryInfo);
+    }';
+
+    drupal_add_js($script, 'inline', 'footer');
+}
+
+/*
+ * Check if current node type is product
+ */
 function retargetingtracker_is_product_page() {
 
     if ( arg(0) == 'node' && is_numeric(arg(1)) && !arg(2) ) {
@@ -264,7 +308,6 @@ function retargetingtracker_is_product_page() {
         // Test for node type, we use a switch to make it easy to look for more than one node type
         switch ( $node->type ) {
             case 'product':
-//                var_dump($node);
                 return $node;
         }
     }
@@ -273,16 +316,23 @@ function retargetingtracker_is_product_page() {
 }
 
 function retargetingtracker_send_product($node) {
-//    echo "<pre>";
-//var_dump(uc_stock_level($node->model) );
 
-    if(uc_stock_level($node->model) > 0) {
-        $stock  = 1;
+    if(module_exists('uc_stoc') && uc_stock_level($node->model) > 0) {
+        $stock = 1;
     } else {
         $stock = 0;
     }
-
-//    if($node->taxonomy)
+    if (module_exists('taxonomy')) {
+        $terms = taxonomy_node_get_terms($node->nid);
+        if (count($terms)) {
+            $term = array_shift($terms);
+            $category_id = $term->tid;
+            $category_name = $term->name;
+        } else {
+            $category_id = 999999999;
+            $category_name = 'No Category';
+        }
+    }
 
     $ra_send_product_info = array(
         'id' => $node->nid,
@@ -293,8 +343,8 @@ function retargetingtracker_send_product($node) {
         'promo' => $node->sell_price,
         'brand' => false,
         'category' => array(
-            'id' => $node->taxonomy[1]->tid,
-            'name' => $node->taxonomy[1]->name,
+            'id' => $category_id,
+            'name' => $category_name,
             'parent' => false,
             'breadcrumb' => array()
         ),
