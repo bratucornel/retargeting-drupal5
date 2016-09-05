@@ -80,22 +80,25 @@ function retargetingtracker_footer($main = 0) {
     /*
      * checkoutIds
      */
-    $productsInCart = uc_cart_get_contents();
 
-    if(!empty($productsInCart) && arg(0) == 'cart') {
-        $ra_checkout_ids_info = array();
-        foreach ($productsInCart as $product) {
-            $ra_checkout_ids_info[] = $product->nid;
-        }
+    if(module_exists('uc_cart')) {
+        $productsInCart = uc_cart_get_contents();
 
-        $checkout_ids_script = '
+        if(!empty($productsInCart) && arg(0) == 'cart') {
+            $ra_checkout_ids_info = array();
+            foreach ($productsInCart as $product) {
+                $ra_checkout_ids_info[] = $product->nid;
+            }
+
+            $checkout_ids_script = '
             var _ra = _ra || {};
             _ra.checkoutIdsInfo = ' . drupal_to_js($ra_checkout_ids_info) . '
              if (_ra.ready !== undefined) {
                 _ra.checkoutIds(_ra.checkoutIdsInfo);
              }       
         ';
-        drupal_add_js($checkout_ids_script, 'inline', 'header');
+            drupal_add_js($checkout_ids_script, 'inline', 'header');
+        }
     }
 
     /*
@@ -318,7 +321,7 @@ function retargetingtracker_is_product_page() {
 function retargetingtracker_send_product($node) {
     global $base_url;
 
-    if(module_exists('uc_stoc') && uc_stock_level($node->model) > 0) {
+    if(module_exists('uc_stock') && uc_stock_level($node->model) > 0) {
         $stock = 1;
     } else {
         $stock = 0;
@@ -366,8 +369,7 @@ function retargetingtracker_send_product($node) {
      * AddToCart
      */
     $retargeting_add_to_cart = '
-    var raAddToCartButton = document.getElementsByClassName("node-add-to-cart")[0];
-    raAddToCartButton.addEventListener("click", function(){
+    document.getElementsByClassName("node-add-to-cart")[0].addEventListener("click", function(){
          _ra.addToCart('.$node->nid.', 1, false, function() {
             console.log("the informations have been sent");
         });
