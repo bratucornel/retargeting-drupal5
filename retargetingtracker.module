@@ -42,7 +42,7 @@ function retargetingtracker_menu($mycache) {
             'description'       =>  'Retargeting tracker settings',
             'callback'          =>  'drupal_get_form',
             'callback arguments'=>  'retargetingtracker_admin_settings_form',
-            'access'            =>  user_access('administer retargeting tracker'),
+            'access'            =>  user_access('administer retargetingtracker'),
             'type'              =>  MENU_NORMAL_ITEM
         );
     }
