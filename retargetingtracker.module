@@ -56,7 +56,12 @@ function retargetingtracker_menu($mycache) {
 function retargetingtracker_footer($main = 0) {
     global $user;
 
-    $trackingKey = variable_get('retargetingtracker_js_key', '');
+    if(module_exists('i18n') && i18n_get_lang() == 'bg') {
+        $trackingKey = variable_get('retargetingtracker_js_key', '');
+    } else {
+        $trackingKey = variable_get('retargetingtracker_js_key_en', '');
+    }
+
     if(empty($trackingKey)) {
         $script = "console.log('Retargeting Tracking API Key not set')";
     } else {
@@ -75,7 +80,12 @@ function retargetingtracker_footer($main = 0) {
             s.parentNode.insertBefore(ra,s);
         })();';
     }
-    drupal_add_js($script, 'inline', 'header');
+    /**
+     * Do not show Retargeting code for specific user type
+     */
+    if(!in_array("dealer", $user->roles)) {
+        drupal_add_js($script, 'inline', 'header');
+    }
 
     /*
      * checkoutIds
@@ -120,7 +130,7 @@ function retargetingtracker_footer($main = 0) {
     if(arg(0) == 'cart' && arg(1) == 'checkout' && arg(2) == 'complete') {
         $tax = 0;
         $shipping_cost = 0;
-//        uc_order_load($_SESSION['uc_googleanalytics_order_id']);
+        //        uc_order_load($_SESSION['uc_googleanalytics_order_id']);
         if($order = uc_order_load($_SESSION['retargetingtracker_order_id'])) {
 
             // Finding name of country; if not found, use the country code.
@@ -153,17 +163,17 @@ function retargetingtracker_footer($main = 0) {
                 'address'       => $order->billing_street1 . ' ' . $order->billing_street1,
                 'discount_code' => 0,
                 'discount'      => 0,
-                'shipping'      => $shipping_cost,
+                'shipping'      => uc_currency_format($shipping_cost, false),
                 'rebates'       => 0,
                 'fees'          => $tax,
-                'total'         => $order->order_total
+                'total'         => uc_currency_format($order->order_total, false)
             );
 
-        $ra_order_products = array();
+            $ra_order_products = array();
             foreach ($order->products as $product) {
                 $ra_order_products['id'] = $product->nid;
                 $ra_order_products['qty'] = $product->qty;
-                $ra_order_products['price'] = $product->price;
+                $ra_order_products['price'] = uc_currency_format($product->price, false);
                 $ra_order_products['variation_code'] = '';
             }
         }
@@ -220,12 +230,22 @@ function retargetingtracker_admin_settings_form() {
 
     $form['account']['retargetingtracker_js_key'] = array(
         '#type'     =>  'textfield',
-        '#title'    =>  'Tracking API KEY',
+        '#title'    =>  'Tracking API KEY for BG',
         '#default_value'    => variable_get('retargetingtracker_js_key', ''),
         '#size'     =>  20,
         '#maxlength'    =>  20,
         '#required'     =>  true,
-        '#description'  =>  'Enter your Javascript Tracking Code. Click here to get it.'
+        '#description'  =>  'Enter your Javascript Tracking Code.'
+    );
+
+    $form['account']['retargetingtracker_js_key_en'] = array(
+        '#type'     =>  'textfield',
+        '#title'    =>  'Tracking API KEY for EN',
+        '#default_value'    => variable_get('retargetingtracker_js_key_en', ''),
+        '#size'     =>  20,
+        '#maxlength'    =>  20,
+        '#required'     =>  true,
+        '#description'  =>  'Enter your Javascript Tracking Code.'
     );
 
     $form['account']['retargetingtracker_rest_api'] = array(
@@ -243,6 +263,7 @@ function retargetingtracker_admin_settings_form() {
 
 function retargetingtracker_admin_settings_form_submit($form_id, $form_values) {
     $form_values['retargetingtracker_js_key'] = trim($form_values['retargetingtracker_js_key']);
+    $form_values['retargetingtracker_js_key_en'] = trim($form_values['retargetingtracker_js_key_en']);
     $form_values['retargetingtracker_rest_api'] = trim($form_values['retargetingtracker_rest_api']);
     system_settings_form_submit($form_id, $form_values);
 }
@@ -321,11 +342,6 @@ function retargetingtracker_is_product_page() {
 function retargetingtracker_send_product($node) {
     global $base_url;
 
-    if(module_exists('uc_stock') && uc_stock_level($node->model) > 0) {
-        $stock = 1;
-    } else {
-        $stock = 0;
-    }
     if (module_exists('taxonomy')) {
         $terms = taxonomy_node_get_terms($node->nid);
         if (count($terms)) {
@@ -338,13 +354,50 @@ function retargetingtracker_send_product($node) {
         }
     }
 
+
+    /*
+     * Prepare product image
+     */
+    $ra_image = 'no image';
+
+    if(isset($node->field_image_cache[0])) {
+        $ra_image = $base_url . '/' . $node->field_image_cache[0]['filepath'];
+    }
+
+    /*
+     * Prepare product URL
+     */
+    $ra_product_url = $base_url . '/' . $node->path;
+
+    /*
+     * Product stock is based on post status.
+     * if product is published stock: true
+     * else stock: false
+     */
+
+    $stock = 0;
+
+    if($node->status == 1) {
+        $stock = 1;
+    }
+
+    /*
+     * Keep this code and use it if you decide to use the uc_stock module
+     *
+     * if(module_exists('uc_stock') && uc_stock_level($node->model) > 0) {
+     *     $stock = 1;
+     * } else {
+     *     $stock = 0;
+     * }
+     */
+
     $ra_send_product_info = array(
         'id' => $node->nid,
         'name' => $node->title,
-        'url' => false,
-        'img' => $node->files[1]->filepath,
-        'price' => $node->list_price,
-        'promo' => $node->sell_price,
+        'url' => $ra_product_url,
+        'img' => $ra_image,
+        'price' => uc_currency_format($node->list_price, false),
+        'promo' => uc_currency_format($node->sell_price, false),
         'brand' => false,
         'category' => array(
             'id' => $category_id,
@@ -369,11 +422,13 @@ function retargetingtracker_send_product($node) {
      * AddToCart
      */
     $retargeting_add_to_cart = '
-    document.getElementsByClassName("node-add-to-cart")[0].addEventListener("click", function(){
-         _ra.addToCart('.$node->nid.', 1, false, function() {
-            console.log("the informations have been sent");
+    if(document.getElementsByClassName("node-add-to-cart").length != 0) {
+        document.getElementsByClassName("node-add-to-cart")[0].addEventListener("click", function(){
+             _ra.addToCart('.$node->nid.', 1, false, function() {
+                console.log("the informations have been sent");
+            });
         });
-    });
+    }
     ';
 
     drupal_add_js($retargeting_add_to_cart, 'inline', 'footer');
