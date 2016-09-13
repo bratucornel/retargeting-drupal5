@@ -4,17 +4,17 @@
 
 ~~sendCategory~~
 
-sendBrand
+~~sendBrand~~
 
 ~~sendProduct~~
 
 ~~addToCart~~
 
-removeFromCart
+~~removeFromCart~~
 
-setVariation
+~~setVariation~~
 
-addToWishlist
+~~addToWishlist~~
 
 clickImage
 
@@ -28,4 +28,4 @@ visitHelpPage
 
 ~~checkoutIds~~
 
-setCartUrl
+~~setCartUrl~~

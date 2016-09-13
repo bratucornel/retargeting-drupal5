@@ -51,21 +51,38 @@ function retargetingtracker_menu($mycache) {
 }
 
 /*
+ * Check if current user role is dealer. If true, do not show retargeting code.
+ */
+function show_the_code() {
+    global $user;
+
+    if(in_array("dealer", $user->roles)) {
+        return false;
+    }
+    return true;
+}
+
+/*
  * Implement of hook_footer() to insert js script
  */
 function retargetingtracker_footer($main = 0) {
     global $user;
+    global $base_url;
 
-    if(module_exists('i18n') && i18n_get_lang() == 'bg') {
+    /*
+     * ra Tracking script
+     */
+
+    if(module_exists('i18n') && i18n_get_lang() == 'bg' && show_the_code() ) {
         $trackingKey = variable_get('retargetingtracker_js_key', '');
     } else {
         $trackingKey = variable_get('retargetingtracker_js_key_en', '');
     }
 
     if(empty($trackingKey)) {
-        $script = "console.log('Retargeting Tracking API Key not set')";
+        $ra_tracking_script = "console.log('Retargeting Tracking API Key not set')";
     } else {
-        $script = '
+        $ra_tracking_script = '
         (function(){
             ra_key = ' . drupal_to_js($trackingKey) . ';
             ra_params = {
@@ -80,18 +97,33 @@ function retargetingtracker_footer($main = 0) {
             s.parentNode.insertBefore(ra,s);
         })();';
     }
-    /**
-     * Do not show Retargeting code for specific user type
+
+    /*
+     * setCartUrl
      */
-    if(!in_array("dealer", $user->roles)) {
-        drupal_add_js($script, 'inline', 'header');
+
+    $cart_url = $base_url.'/cart';
+
+    if(module_exists('i18n') && i18n_get_lang() == 'bg' && show_the_code()) {
+        $cart_url = $base_url.'/bg/cart';
+    } else {
+        $cart_url = $base_url.'/en/cart';
     }
+
+    $ra_set_cart_url = 'var _ra = _ra || {};
+    _ra.setCartUrlInfo = {
+        "url": "' . $cart_url . '"
+    };
+    
+    if (_ra.ready !== undefined) {
+        _ra.setCartUrl(_ra.setCartUrlInfo.url);
+    }';
 
     /*
      * checkoutIds
      */
 
-    if(module_exists('uc_cart')) {
+    if(module_exists('uc_cart') && show_the_code()) {
         $productsInCart = uc_cart_get_contents();
 
         if(!empty($productsInCart) && arg(0) == 'cart') {
@@ -114,20 +146,19 @@ function retargetingtracker_footer($main = 0) {
     /*
      * setEmail implementation
      */
-    if(isset($user->mail)) {
+    if(isset($user->mail) && show_the_code()) {
         $ra_set_email   = '
             var _ra = _ra || {};
             if (_ra.ready !== undefined) {
         ';
-        $ra_set_email .= '_ra.setEmail({"email": '.drupal_to_js($user->mail).'});';
-        $ra_set_email .= '};';
+        $ra_set_email .= '_ra.setEmail({"email": '.drupal_to_js($user->mail).'});};';
         drupal_add_js($ra_set_email, 'inline', 'header');
     }
 
     /*
      * saveOrder
      */
-    if(arg(0) == 'cart' && arg(1) == 'checkout' && arg(2) == 'complete') {
+    if(arg(0) == 'cart' && arg(1) == 'checkout' && arg(2) == 'complete' && show_the_code() ) {
         $tax = 0;
         $shipping_cost = 0;
         //        uc_order_load($_SESSION['uc_googleanalytics_order_id']);
@@ -172,14 +203,14 @@ function retargetingtracker_footer($main = 0) {
             $ra_order_products = array();
             foreach ($order->products as $product) {
                 $ra_order_products['id'] = $product->nid;
-                $ra_order_products['qty'] = $product->qty;
+                $ra_order_products['quantity'] = $product->qty;
                 $ra_order_products['price'] = uc_currency_format($product->price, false);
                 $ra_order_products['variation_code'] = '';
             }
         }
         $save_order_script = 'var _ra = _ra || {};' . "\r\n";
-        $save_order_script .= '_ra.saveOrderInfo = ' . json_encode($ra_order_info) . "\r\n";
-        $save_order_script .= '_ra.saveOrderProducts = ' . json_encode($ra_order_products) . "\r\n";
+        $save_order_script .= '_ra.saveOrderInfo = ' . json_encode($ra_order_info) . ";\r\n";
+        $save_order_script .= '_ra.saveOrderProducts = ' . '[' . json_encode($ra_order_products) . '];' . "\r\n";
         $save_order_script .= '
          if( _ra.ready !== undefined ) {
             _ra.saveOrder(_ra.saveOrderInfo, _ra.saveOrderProducts);
@@ -196,7 +227,7 @@ function retargetingtracker_footer($main = 0) {
     */
     $is_product = retargetingtracker_is_product_page();
 
-    if($is_product !== false ){
+    if($is_product !== false && show_the_code() ){
         retargetingtracker_send_product($is_product);
     }
 
@@ -205,8 +236,16 @@ function retargetingtracker_footer($main = 0) {
      */
 
     $is_category = retargetingtracker_is_category();
-    if($is_category !== false) {
+    if($is_category !== false && show_the_code() ) {
         retargetingtracker_send_category($is_category);
+    }
+
+    /*
+     * Check user account and show the code
+     */
+    if(show_the_code()) {
+        drupal_add_js($ra_tracking_script, 'inline', 'header');
+        drupal_add_js($ra_set_cart_url, 'inline', 'header');
     }
 }
 
@@ -235,7 +274,7 @@ function retargetingtracker_admin_settings_form() {
         '#size'     =>  20,
         '#maxlength'    =>  20,
         '#required'     =>  true,
-        '#description'  =>  'Enter your Javascript Tracking Code.'
+        '#description'  =>  'Enter your Javascript Tracking Code for BG Store View.'
     );
 
     $form['account']['retargetingtracker_js_key_en'] = array(
@@ -245,7 +284,7 @@ function retargetingtracker_admin_settings_form() {
         '#size'     =>  20,
         '#maxlength'    =>  20,
         '#required'     =>  true,
-        '#description'  =>  'Enter your Javascript Tracking Code.'
+        '#description'  =>  'Enter your Javascript Tracking Code for EN Store View.'
     );
 
     $form['account']['retargetingtracker_rest_api'] = array(
@@ -258,6 +297,16 @@ function retargetingtracker_admin_settings_form() {
         '#description'  =>  'Enter your REST API Key'
     );
 
+    $form['account']['retargetingtracker_rest_api_en'] = array(
+        '#type'     =>  'textfield',
+        '#title'    =>  'REST API Key for EN',
+        '#default_value'    =>  variable_get('retargetingtracker_rest_api', ''),
+        '#size'         =>  20,
+        '#maxlength'    =>  20,
+        '#required'     => true,
+        '#description'  =>  'Enter your REST API Key for EN Store View'
+    );
+
     return system_settings_form($form);
 }
 
@@ -265,6 +314,7 @@ function retargetingtracker_admin_settings_form_submit($form_id, $form_values) {
     $form_values['retargetingtracker_js_key'] = trim($form_values['retargetingtracker_js_key']);
     $form_values['retargetingtracker_js_key_en'] = trim($form_values['retargetingtracker_js_key_en']);
     $form_values['retargetingtracker_rest_api'] = trim($form_values['retargetingtracker_rest_api']);
+    $form_values['retargetingtracker_rest_api_en'] = trim($form_values['retargetingtracker_rest_api_en']);
     system_settings_form_submit($form_id, $form_values);
 }
 
@@ -318,7 +368,9 @@ function retargetingtracker_send_category($details) {
         _ra.sendCategory(_ra.sendCategoryInfo);
     }';
 
-    drupal_add_js($script, 'inline', 'footer');
+    if(show_the_code()) {
+        drupal_add_js($script, 'inline', 'footer');
+    }
 }
 
 /*
@@ -391,19 +443,38 @@ function retargetingtracker_send_product($node) {
      * }
      */
 
+    /*
+     * Get Product Price and Special Price
+     */
+    $product_price = uc_currency_format($node->sell_price_high, false);
+    $product_special_price = uc_currency_format($node->sell_price, false);
+
+    $ra_special_price = $product_special_price;
+
+    if($product_price < $product_special_price) {
+        $ra_product_price = $product_special_price;
+        $ra_special_price = 0;
+    }
+
+    if($product_price == $product_special_price) {
+        $ra_special_price = 0;
+    }
+
     $ra_send_product_info = array(
         'id' => $node->nid,
         'name' => $node->title,
         'url' => $ra_product_url,
         'img' => $ra_image,
-        'price' => uc_currency_format($node->list_price, false),
-        'promo' => uc_currency_format($node->sell_price, false),
+        'price' => $ra_product_price,
+        'promo' => $ra_special_price,
         'brand' => false,
         'category' => array(
-            'id' => $category_id,
-            'name' => $category_name,
-            'parent' => false,
-            'breadcrumb' => array()
+            array(
+                'id' => $category_id,
+                'name' => $category_name,
+                'parent' => false,
+                'breadcrumb' => array()
+            )
         ),
         'inventory' => array(
             'variations' => false,
@@ -416,14 +487,13 @@ function retargetingtracker_send_product($node) {
     $script .= "if (_ra.ready !== undefined) {
         _ra.sendProduct(_ra.sendProductInfo);}";
 
-    drupal_add_js($script, 'inline', 'footer');
-
     /*
      * AddToCart
      */
     $retargeting_add_to_cart = '
-    if(document.getElementsByClassName("node-add-to-cart").length != 0) {
-        document.getElementsByClassName("node-add-to-cart")[0].addEventListener("click", function(){
+    var _ra_cart_button = document.querySelector(".node-add-to-cart");
+    if(_ra_cart_button != 0) {
+        _ra_cart_button.addEventListener("click", function(){
              _ra.addToCart('.$node->nid.', 1, false, function() {
                 console.log("the informations have been sent");
             });
@@ -431,6 +501,17 @@ function retargetingtracker_send_product($node) {
     }
     ';
 
-    drupal_add_js($retargeting_add_to_cart, 'inline', 'footer');
+    $retargeting_click_image = '
+        document.querySelector(".MagicZoomPlus").addEventListener("click", function(){
+             _ra.clickImage('.$node->nid.', function() {
+                    console.log("the informations have been sent");
+                });
+        });
+    ';
 
+    if(show_the_code()) {
+        drupal_add_js($script, 'inline', 'footer');
+        drupal_add_js($retargeting_click_image, 'inline', 'footer');
+        drupal_add_js($retargeting_add_to_cart, 'inline', 'footer');
+    }
 }
