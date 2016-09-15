@@ -161,7 +161,7 @@ function retargetingtracker_footer($main = 0) {
     if(arg(0) == 'cart' && arg(1) == 'checkout' && arg(2) == 'complete' && show_the_code() ) {
         $tax = 0;
         $shipping_cost = 0;
-        //        uc_order_load($_SESSION['uc_googleanalytics_order_id']);
+
         if($order = uc_order_load($_SESSION['retargetingtracker_order_id'])) {
 
             // Finding name of country; if not found, use the country code.
@@ -183,10 +183,18 @@ function retargetingtracker_footer($main = 0) {
                 }
             }
 
+            $ra_order_billing_first_name = $order->billing_first_name;
+            $ra_order_billing_last_name = $order->billing_last_name;
+
+            if($ra_order_billing_first_name == '' || $ra_order_billing_last_name == '') {
+                $ra_order_billing_first_name = $order->delivery_first_name;
+                $ra_order_billing_last_name = $order->delivery_last_name;
+            }
+
             $ra_order_info = array(
                 'order_no'      => $order->order_id,
-                'lastname'      => $order->billing_first_name,
-                'firstname'     => $order->billing_last_name,
+                'lastname'      => $ra_order_billing_first_name,
+                'firstname'     => $ra_order_billing_last_name,
                 'email'         => $order->primary_email,
                 'phone'         => $order->billing_phone,
                 'state'         => $country,
@@ -202,15 +210,18 @@ function retargetingtracker_footer($main = 0) {
 
             $ra_order_products = array();
             foreach ($order->products as $product) {
-                $ra_order_products['id'] = $product->nid;
-                $ra_order_products['quantity'] = $product->qty;
-                $ra_order_products['price'] = uc_currency_format($product->price, false);
-                $ra_order_products['variation_code'] = '';
+                $_ra_ordered_product = array(
+                        'id' => $product->nid,
+                        'quantity' => $product->qty,
+                        'price'  =>  uc_currency_format($product->price, false),
+                        'variation_code'  =>  ''
+                );
+                $ra_order_products[] = $_ra_ordered_product;
             }
         }
         $save_order_script = 'var _ra = _ra || {};' . "\r\n";
         $save_order_script .= '_ra.saveOrderInfo = ' . json_encode($ra_order_info) . ";\r\n";
-        $save_order_script .= '_ra.saveOrderProducts = ' . '[' . json_encode($ra_order_products) . '];' . "\r\n";
+        $save_order_script .= '_ra.saveOrderProducts = ' . json_encode($ra_order_products) . ";\r\n";
         $save_order_script .= '
          if( _ra.ready !== undefined ) {
             _ra.saveOrder(_ra.saveOrderInfo, _ra.saveOrderProducts);
@@ -218,7 +229,7 @@ function retargetingtracker_footer($main = 0) {
         ';
 
         drupal_add_js($save_order_script, 'inline', 'footer');
-        unset($_SESSION['retargetingtracker_order_id']);
+//        unset($_SESSION['retargetingtracker_order_id']);
     }
 
 
@@ -492,22 +503,24 @@ function retargetingtracker_send_product($node) {
      */
     $retargeting_add_to_cart = '
     var _ra_cart_button = document.querySelector(".node-add-to-cart");
-    if(_ra_cart_button != 0) {
+    if(_ra_cart_button !== null) {
         _ra_cart_button.addEventListener("click", function(){
              _ra.addToCart('.$node->nid.', 1, false, function() {
-                console.log("the informations have been sent");
+                console.log("the information have been sent");
             });
         });
     }
     ';
 
     $retargeting_click_image = '
+    var _ra_image = document.querySelector(".MagicZoomPlus");
+    if(_ra_image !== null) {
         document.querySelector(".MagicZoomPlus").addEventListener("click", function(){
              _ra.clickImage('.$node->nid.', function() {
-                    console.log("the informations have been sent");
+                    console.log("the information have been sent");
                 });
         });
-    ';
+    }';
 
     if(show_the_code()) {
         drupal_add_js($script, 'inline', 'footer');
