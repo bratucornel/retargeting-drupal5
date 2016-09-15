@@ -353,6 +353,12 @@ function retargetingtracker_requirements($phase) {
  * Check if current page is category
  */
 function retargetingtracker_is_category() {
+
+    if (arg(0) == 'catalog') {
+        $category_details = taxonomy_get_term(arg(1));
+        return array($category_details);
+    }
+
     if (arg(0) == 'taxonomy' && arg(1) == 'term' && arg(2)) {
         $category_details = taxonomy_node_get_terms(arg(2));
         return $category_details;
@@ -460,6 +466,7 @@ function retargetingtracker_send_product($node) {
     $product_price = uc_currency_format($node->sell_price_high, false);
     $product_special_price = uc_currency_format($node->sell_price, false);
 
+    $ra_product_price = $product_price;
     $ra_special_price = $product_special_price;
 
     if($product_price < $product_special_price) {
